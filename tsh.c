@@ -106,7 +106,6 @@ static void cmdexec(char *cmd)
      * argv에 저장된 명령어를 실행한다.
      */
     if (argc > 0){
-        // if(fork() == 0) { first try to implement pipe function. but no need to be a child process.
         if (ispipe) {
             pipe(pipefd);
             if(fork() == 0) {
@@ -114,7 +113,6 @@ static void cmdexec(char *cmd)
                 dup2(pipefd[1], STDOUT_FILENO);
                 close(pipefd[1]);
                 execvp(argv[0], argv);
-                printf("execvp for pipe success.\n");
                 exit(EXIT_SUCCESS);
             }
             if(fork() == 0) {
@@ -124,26 +122,29 @@ static void cmdexec(char *cmd)
                 cmdexec(p);
                 exit(EXIT_SUCCESS);
             }
-        } wait(NULL);
-        if (infile) {
-            int fd = open(infile, O_RDONLY);
-            if(fd < 0) {
-                perror("file open failed.");
-                exit(EXIT_FAILURE);
-            }
-            dup2(fd, STDIN_FILENO);
-            close(fd);
         }
-        if (outfile) {
-            int fd = open(outfile, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-            if(fd < 0) {
-                perror("file open error.");
-                exit(EXIT_FAILURE);
+        // if (fork() == 0) { //this child process partition is necessary to avoid execution of first pipe command.
+        if(!ispipe) {
+            if (infile) {
+                int fd = open(infile, O_RDONLY);
+                if(fd < 0) {
+                    perror("file open failed.");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fd, STDIN_FILENO);
+                close(fd);
+            } wait(NULL);
+            if (outfile) {
+                int fd = open(outfile, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+                if(fd < 0) {
+                    perror("file open error.");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
             }
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-        }
             execvp(argv[0], argv);
+        }
         //     exit(EXIT_SUCCESS);
         // }
         // wait(NULL);
