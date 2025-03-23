@@ -17,45 +17,6 @@
 #define MAX_LINE 80             /* 명령어의 최대 길이 */
 
 /*
- * find - find the element number that corresponding to tgt from arr.
- * tgt : the one that looking for.
- * arr : array that you want to search for.
- * size: size of *arr.
- */
-static int find(char tgt, char* arr) {
-    int size = sizeof(arr) / sizeof(char);
-    if (size <= 1) return NULL;
-    for (int i = 0; i < size; i++) {
-        if (arr[i] == tgt) return i;
-    }
-}
-
-/*
- * slicer - slice the array based on the place of the target item, and returns the backside array.
- * arr : target array.
- * t_no: number of target found by find() command, may be changed.
- * size: size of *arr.
- * rs  : Will be replaced by frontside array.
- */
-static char* slicer(char* arr, int t_no, char* rs) {
-    int size = sizeof(arr) / sizeof(char);
-    if(size == 0 || t_no == NULL)
-        return NULL;
-    char* back[size - t_no - 1];
-    char* tmp[t_no];
-    int c_p = 0;
-    do {
-        if (c_p < t_no)
-            tmp[c_p] = arr[c_p];
-        else if (c_p > t_no)
-            back[c_p] = arr[c_p];
-        c_p++;
-    } while(arr);
-    rs = tmp;
-    return back;
-}
-
-/*
  * cmdexec - 명령어를 파싱해서 실행한다.
  * 스페이스와 탭을 공백문자로 간주하고, 연속된 공백문자는 하나의 공백문자로 축소한다. 
  * 작은 따옴표나 큰 따옴표로 이루어진 문자열을 하나의 인자로 처리한다.
@@ -67,11 +28,7 @@ static void cmdexec(char *cmd)
     char *argv[MAX_LINE/2+1];   /* 명령어 인자를 저장하기 위한 배열 */
     int argc = 0;               /* 인자의 개수 */
     char *p, *q;                /* 명령어를 파싱하기 위한 변수 */
-    struct stat file_stat;	/* to get the file's size */
-    ssize_t bytes;		/* represents the bytes that has been read. */
-    int pid;
-    int r, s;
-    bool fileout = false;
+    char *infile = NULL, *outfile = NULL;       /* variable to store file names */
 
     /*
      * 명령어 앞부분 공백문자를 제거하고 인자를 하나씩 꺼내서 argv에 차례로 저장한다.
@@ -82,13 +39,35 @@ static void cmdexec(char *cmd)
         /*
          * 공백문자, 큰 따옴표, 작은 따옴표가 있는지 검사한다.
          */ 
-        q = strpbrk(p, " \t\'\""); //returns pointer of first one that matches the " \t\'\"".
+        q = strpbrk(p, " \t\'\"<>|"); //returns pointer of first one that matches the " \t\'\"".
         /*
-	 * 공백문자가 있거나 아무 것도 없으면 공백문자까지 또는 전체를 하나의 인자로 처리한다.
+	     * 공백문자가 있거나 아무 것도 없으면 공백문자까지 또는 전체를 하나의 인자로 처리한다.
          */ 
         if (q == NULL || *q == ' ' || *q == '\t') {
             q = strsep(&p, " \t"); //returns entire set of characters brfore meets the " \t", and &p points the character after " " or "\t".
             if (*q) argv[argc++] = q;
+        }
+        /*
+         * if q is < then adds next word into the input file infile.
+         */
+        else if(*q == '<') {
+            strsep(&p, "<");
+            while (*p == ' ' || *p == '\t') p++; //remove the empty space after the "<".
+            infile = strsep(&p, " \t\0");
+        }
+        /*
+         * if q is > then adds next word into the output file outfile.
+         */
+        else if(*q == '>') {
+            strsep(&p, ">");
+            while(*p == ' ' || *p == '\t') p++; //remove the empty space after the ">".
+            outfile = strsep(&p, " \t\0");
+        }
+        /*
+         * if q is | what have to be done.
+         */
+        else if(*q == '|') {
+            
         }
         /*
          * 작은 따옴표가 있으면 그 위치까지 하나의 인자로 처리하고, 
@@ -120,60 +99,29 @@ static void cmdexec(char *cmd)
      * argv에 저장된 명령어를 실행한다.
      */
     if (argc > 0){
-        
-        /*
-         * case "<>". - 2022079952_KimDongMin_2024/03/23
-         */
-        r = find('<', argv);
-        char *inf, *outf, *rs;
-        int fd;
-        if(r != NULL){
-            inf = slicer(argv, r, rs);
-            s = find('>', inf);
-            if (s != NULL) { // when there is < and after that there is > inside the line, passes this option.
-                fileout = true;
-                outf = slicer(inf, s, rs);
+        if(fork() == 0) {
+            if (infile) {
+                int fd = open(infile, O_RDONLY);
+                if(fd < 0) {
+                    perror("file open failed.");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fd, STDIN_FILENO);
+                close(fd);
             }
-            fd = open(inf, O_RDONLY);
-            dup2(fd, STDIN_FILENO);
-            size_t s = file_stat.st_size;
-            char *buffer = (char *)malloc(s + 1);
-            bytes = read(STDIN_FILENO, buffer, s);
-            if (bytes < 0) {
-                printf("failed to read from the file.");
+            if (outfile) {
+                int fd = open(outfile, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+                if(fd < 0) {
+                    perror("file open error.");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
             }
-            else {
-                argv[argc++] = buffer;
-            }
-            free(buffer);
-            close(fd);
-        }
-        else {
-            r = find('>', argv);
-            if(r != NULL) {
-                fileout = true;
-                outf = slicer(argv, r, rs);
-                open(outf, O_CREAT | O_TRUNC | O_WRONLY, 0644);
-                pid = fork();
-                    dup2(fd, STDOUT_FILENO);
-                    execvp(argv[0], argv);
-            }
-        }
-        /*
-         * case '|'. - 2022079952_KimDongMin_2024/03/23
-         */
-        r = find('|', argv);
-        switch (fileout)
-        {
-        case true:
-            /* code */
-            
-            break;
-        default:
             execvp(argv[0], argv);
-            break;
+            exit(EXIT_SUCCESS);
         }
-        // execvp(argv[0], argv);    
+        wait(NULL);
     }
 }
 /*
@@ -201,7 +149,7 @@ int main(void)
         /*
          * 셸 프롬프트를 출력한다. 지연 출력을 방지하기 위해 출력버퍼를 강제로 비운다.
          */
-        printf("tsh> "); fflush(stdout);//fflush: emptying the output buffer so that tsh> is showing right away.
+        printf("tsh> "); fflush(stdout);//fflush: empty the output buffer so that tsh> is show right away.
         /*
          * 표준 입력장치로부터 최대 MAX_LINE까지 명령어를 입력 받는다.
          * 입력된 명령어 끝에 있는 새줄문자를 널문자로 바꿔 C 문자열로 만든다.
