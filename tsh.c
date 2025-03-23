@@ -137,20 +137,19 @@ static void cmdexec(char *cmd)
             if(fork() == 0) {
                 close(pipefd[0]);
                 dup2(pipefd[1], STDOUT_FILENO);
-                
                 IOcon(infile, outfile, argv);
                 exit(EXIT_SUCCESS);
             }
             if(fork() == 0) {
                 close(pipefd[1]);
                 dup2(pipefd[0], STDIN_FILENO);
-                
                 cmdexec(p);
                 exit(EXIT_SUCCESS);
             }
             close(pipefd[1]);
             close(pipefd[0]); //thsi was the problem. I didn't close the pipefd[0] and pipefd[1] after the pipe command.
             wait(NULL); // adding another wait to figure this works.
+            wait(NULL);
             // exit(EXIT_SUCCESS); //restoreing this waiting process didn't solved the problem.
         }
         //wait(NULL);
