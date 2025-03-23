@@ -114,6 +114,7 @@ static void cmdexec(char *cmd)
                 dup2(pipefd[1], STDOUT_FILENO);
                 close(pipefd[1]);
                 execvp(argv[0], argv);
+                printf("execvp for pipe success.\n");
                 exit(EXIT_SUCCESS);
             }
             if(fork() == 0) {
