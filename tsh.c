@@ -29,6 +29,8 @@ static void cmdexec(char *cmd)
     int argc = 0;               /* 인자의 개수 */
     char *p, *q;                /* 명령어를 파싱하기 위한 변수 */
     char *infile = NULL, *outfile = NULL;       /* variable to store file names */
+    bool ispipe = false;          /* variable to check pipe */
+    int pipefd[2];             /* variable to store pipe file descriptors */
 
     /*
      * 명령어 앞부분 공백문자를 제거하고 인자를 하나씩 꺼내서 argv에 차례로 저장한다.
@@ -64,10 +66,15 @@ static void cmdexec(char *cmd)
             outfile = strsep(&p, " \t\0");
         }
         /*
-         * if q is | what have to be done.
+         * if q is | when meets this the work have to be done recursivly.
+         * so, the command before the | is executed and the output is used as the input of the next command.
+         * here, implement pipe checker.
+         * implementing pipe function will be done in the execution part.
          */
         else if(*q == '|') {
-            
+            ispipe = true;
+            strsep(&p, "|");
+            break;
         }
         /*
          * 작은 따옴표가 있으면 그 위치까지 하나의 인자로 처리하고, 
@@ -99,29 +106,46 @@ static void cmdexec(char *cmd)
      * argv에 저장된 명령어를 실행한다.
      */
     if (argc > 0){
-        if(fork() == 0) {
-            if (infile) {
-                int fd = open(infile, O_RDONLY);
-                if(fd < 0) {
-                    perror("file open failed.");
-                    exit(EXIT_FAILURE);
-                }
-                dup2(fd, STDIN_FILENO);
-                close(fd);
+        // if(fork() == 0) { first try to implement pipe function. but no need to be a child process.
+        if (ispipe) {
+            pipe(pipefd);
+            if(fork() == 0) {
+                close(pipefd[0]);
+                dup2(pipefd[1], STDOUT_FILENO);
+                close(pipefd[1]);
+                execvp(argv[0], argv);
+                exit(EXIT_SUCCESS);
             }
-            if (outfile) {
-                int fd = open(outfile, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-                if(fd < 0) {
-                    perror("file open error.");
-                    exit(EXIT_FAILURE);
-                }
-                dup2(fd, STDOUT_FILENO);
-                close(fd);
+            if(fork() == 0) {
+                close(pipefd[1]);
+                dup2(pipefd[0], STDIN_FILENO);
+                close(pipefd[0]);
+                cmdexec(p);
+                exit(EXIT_SUCCESS);
             }
-            execvp(argv[0], argv);
-            exit(EXIT_SUCCESS);
+        } wait(NULL);
+        if (infile) {
+            int fd = open(infile, O_RDONLY);
+            if(fd < 0) {
+                perror("file open failed.");
+                exit(EXIT_FAILURE);
+            }
+            dup2(fd, STDIN_FILENO);
+            close(fd);
         }
-        wait(NULL);
+        if (outfile) {
+            int fd = open(outfile, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+            if(fd < 0) {
+                perror("file open error.");
+                exit(EXIT_FAILURE);
+            }
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
+            execvp(argv[0], argv);
+        //     exit(EXIT_SUCCESS);
+        // }
+        // wait(NULL);
     }
 }
 /*

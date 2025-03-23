@@ -1,7 +1,8 @@
--rw-r--r-- 1 os os     0  3월 23 21:05 delme
+-rw-r--r-- 1 os os     0  3월 23 21:15 delme
+-rw-r--r-- 1 os os   298  3월 23 21:06 delme2
 -rw-r--r-- 1 os os   408  3월 19 01:04 Makefile
 -rw-r--r-- 1 os os  6790  3월 19 13:49 tsh.skeleton.c
--rw-rw-r-- 1 os os  8147  3월 23 21:04 tsh.c
--rwxrwxr-x 1 os os 17520  3월 23 21:04 tsh
+-rw-rw-r-- 1 os os  8227  3월 23 21:13 tsh.c
+-rwxrwxr-x 1 os os 17520  3월 23 21:13 tsh
 drwxrwxr-x 2 os os  4096  3월 19 01:04 __MACOSX
-total 44
+total 52
