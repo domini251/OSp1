@@ -1,5 +1,6 @@
 /Makefile
 /__MACOSX
-/delme
-/test
+/delme*
 /tsh
+/.vscode
+/.vscode/*
