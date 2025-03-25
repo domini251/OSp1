@@ -16,7 +16,14 @@
 
 #define MAX_LINE 80             /* 명령어의 최대 길이 */
 
-static void IOcon(char *infile, char *outfile, char *argv[]) {
+/*
+    * IOcon - input/output redirection function.
+    * this function is used to redirect the input and output of the command.
+    * if the infile is TRUE, it opens the file and redirect the input to the file.
+    * if the outfile is TRUE, it opens the file and redirect the output to the file.
+    * if the argv is not NULL, it executes the command with the argv.
+ */
+static void iord(char *infile, char *outfile, char *argv[]) {
     if (infile) {
         int fd = open(infile, O_RDONLY);
         if(fd < 0) {
@@ -88,10 +95,9 @@ static void cmdexec(char *cmd)
             outfile = strsep(&p, " \t\0");
         }
         /*
-         * if q is | when meets this the work have to be done recursivly.
-         * so, the command before the | is executed and the output is used as the input of the next command.
-         * here, implement pipe checker.
-         * implementing pipe function will be done in the execution part.
+         * if q is | the work after this command have to be done by child process recursivly.
+         * change the ispipe to TRUE to activate the pipe execution.
+         * the command after this don't need to be in the argv stack. so, this phase break the loop.
          */
         else if(*q == '|') {
             ispipe = true;
@@ -129,30 +135,22 @@ static void cmdexec(char *cmd)
      */
     if (argc > 0){
         if (!ispipe) {
-            IOcon(infile, outfile, argv);
+            iord(infile, outfile, argv);
         }
-        // if (fork() == 0) { //this child process partition is necessary to avoid execution of first pipe command.
         else {
             pipe(pipefd);
             if(fork() == 0) {
                 close(pipefd[0]);
                 dup2(pipefd[1], STDOUT_FILENO);
-                IOcon(infile, outfile, argv);
-                exit(EXIT_SUCCESS);
-            }
-            if(fork() == 0) {
+                iord(infile, outfile, argv); //check the input and output redirection. Then do execvp.
                 close(pipefd[1]);
-                dup2(pipefd[0], STDIN_FILENO);
-                cmdexec(p);
                 exit(EXIT_SUCCESS);
             }
             close(pipefd[1]);
-            close(pipefd[0]); //thsi was the problem. I didn't close the pipefd[0] and pipefd[1] after the pipe command.
-            wait(NULL); // adding another wait to figure this works.
-            wait(NULL);
-            // exit(EXIT_SUCCESS); //restoreing this waiting process didn't solved the problem.
+            dup2(pipefd[0], STDIN_FILENO);
+            cmdexec(p);
+            close(pipefd[0]);
         }
-        //wait(NULL);
     }
 }
 /*
