@@ -59,7 +59,6 @@ static void cmdexec(char *cmd)
     char *p, *q;                /* 명령어를 파싱하기 위한 변수 */
     char *infile = NULL, *outfile = NULL;       /* variable to store file names */
     bool ispipe = false;          /* variable to check pipe */
-    int pipefd[2];             /* variable to store pipe file descriptors */
 
     /*
      * 명령어 앞부분 공백문자를 제거하고 인자를 하나씩 꺼내서 argv에 차례로 저장한다.
@@ -134,10 +133,16 @@ static void cmdexec(char *cmd)
      * argv에 저장된 명령어를 실행한다.
      */
     if (argc > 0){
-        if (!ispipe) {
-            iord(infile, outfile, argv);
+        if (!ispipe) { //check whether the command is pipe or not.
+            iord(infile, outfile, argv); //check the input and output redirection. Then do execvp.
         }
+        /*
+         * if the command is pipe, then do the pipe process.
+         * make a pipe and fork the child process to execute the front command.
+         * then, the parent process execute the cmdexec recursivly to do the same for the left cmd.
+         */
         else {
+            int pipefd[2]; /* variable to store pipe file descriptors */
             pipe(pipefd);
             if(fork() == 0) {
                 close(pipefd[0]);
